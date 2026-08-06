@@ -6,6 +6,8 @@ Complete source code for all shared BFF libraries. These form the foundation tha
 
 Uses `@hapi/iron` for symmetric encryption. The session cookie is httpOnly (no JS access), Secure (HTTPS only), SameSite=Lax (CSRF baseline protection).
 
+`Secure` is derived from `ALLOWED_ORIGIN`: browsers silently drop `Secure` cookies sent over plain http, so local dev on `http://localhost` must omit the flag or login never sticks. Anything else (including an unset `ALLOWED_ORIGIN`, i.e. Azure) stays secure.
+
 The `decodeURIComponent()` in `parseCookie` is critical: Azure SWA URL-encodes cookie values, turning `Fe26.2**...` into `Fe26.2%2A%2A...`. Without decoding, `unseal()` fails silently and the user appears logged out.
 
 ```typescript
@@ -14,6 +16,10 @@ import type { Cookie } from '@azure/functions';
 
 const SESSION_SECRET = process.env.SESSION_SECRET!;
 const COOKIE_NAME = '__session';
+
+// Browsers drop `Secure` cookies sent over plain http, so local dev (http://localhost)
+// must omit it. Defaults to secure when ALLOWED_ORIGIN is unset (i.e. in Azure).
+const SECURE_COOKIE = !process.env.ALLOWED_ORIGIN?.startsWith('http://');
 
 export type SessionData = {
   accessToken: string;
@@ -53,7 +59,7 @@ export function sessionCookie(sealed: string): Cookie {
     name: COOKIE_NAME,
     value: sealed,
     httpOnly: true,
-    secure: true,
+    secure: SECURE_COOKIE,
     sameSite: 'Lax',
     path: '/',
     maxAge: 86400,
@@ -65,7 +71,7 @@ export function clearSessionCookieObj(): Cookie {
     name: COOKIE_NAME,
     value: '',
     httpOnly: true,
-    secure: true,
+    secure: SECURE_COOKIE,
     sameSite: 'Lax',
     path: '/',
     maxAge: 0,

@@ -83,6 +83,8 @@ Standard Azure Functions v4 host configuration with extension bundle.
 
 Add `bff/local.settings.json` to `.gitignore`. This file holds secrets for local development.
 
+`ALLOWED_ORIGIN` must be the dev server origin (`http://localhost:4200`). Its `http://` scheme is also what makes `session.ts` drop the `Secure` cookie flag, without which local login never persists.
+
 ```json
 {
   "IsEncrypted": false,

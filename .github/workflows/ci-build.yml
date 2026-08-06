@@ -21,9 +21,9 @@ jobs:
     container: mcr.microsoft.com/playwright:v1.58.2-noble
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -79,14 +79,14 @@ jobs:
       security-events: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         # Full history so Fallow's auto-changed-since can diff against the PR
         # base SHA; a shallow checkout would break that "changed files" scoping.
         with:
           fetch-depth: 0
 
       - name: Fallow analysis
-        uses: fallow-rs/fallow@v2.89.0
+        uses: fallow-rs/fallow@v3.10.0
         with:
           format: sarif
           # Report findings (surfaced in Code Scanning) without failing CI.

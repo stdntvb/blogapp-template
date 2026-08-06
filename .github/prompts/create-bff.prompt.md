@@ -87,7 +87,7 @@ bff/
 
 Read the **lib-implementations** reference for the exact source code of all five library files. Copy these as-is, then adapt environment variable names and backend URL patterns to the target project. The key design decisions:
 
-1. **session.ts** — Uses `@hapi/iron` for symmetric encryption of `{ accessToken, refreshToken, expiresAt }`. Cookie is httpOnly, Secure, SameSite=Lax. Includes `decodeURIComponent()` fallback because Azure SWA URL-encodes cookie values.
+1. **session.ts** — Uses `@hapi/iron` for symmetric encryption of `{ accessToken, refreshToken, expiresAt }`. Cookie is httpOnly, SameSite=Lax, and `Secure` unless `ALLOWED_ORIGIN` is an `http://` URL (local dev). Includes `decodeURIComponent()` fallback because Azure SWA URL-encodes cookie values.
 
 2. **keycloak.ts** — Resource Owner Password Credentials (ROPC) grant for login, refresh_token grant for renewal, token revocation for logout. Uses `URLSearchParams` for form-encoded bodies.
 
@@ -155,11 +155,48 @@ export const bffInterceptor: HttpInterceptorFn = (req, next) => {
 };
 ```
 
-2. **Environment config** — Point to `/api` in production (same origin, served by Azure SWA) and `http://localhost:7071/api` in development (Azure Functions local runtime).
+2. **Environment config** — Use `/api` in **both** environments. Production is same-origin via Azure SWA; development is made same-origin by the dev-server proxy (Step 6). Do not point development at `http://localhost:7071/api` — that is cross-origin and breaks the login cookie (see Step 6).
 
-### Step 6: Configure local development
+```typescript
+// src/environments/environment.development.ts
+export const environment = {
+  production: false,
+  // Same-origin as production: ng serve proxies /api to the BFF (see proxy.conf.json)
+  bffUrl: '/api',
+};
+```
 
-Use `concurrently` to run the frontend dev server and BFF together:
+### Step 6: Configure local development (same-origin login)
+
+Local login only works if the browser actually stores and returns the session cookie. Two things break it out of the box:
+
+- **Cross-origin cookies** — `http://localhost:4200` calling `http://localhost:7071` is a cross-site request. Modern browsers reject the `SameSite=Lax` session cookie there, so login returns 200 but every following request is anonymous. Fix: proxy `/api` through the dev server so frontend and BFF share one origin.
+- **`Secure` over plain http** — browsers silently drop `Secure` cookies on `http://localhost`. Fix: derive the flag from `ALLOWED_ORIGIN` in `session.ts` (see **lib-implementations** reference).
+
+1. **Dev-server proxy** — create `proxy.conf.json` at the project root:
+
+```json
+{
+  "/api": {
+    "target": "http://localhost:7071",
+    "secure": false
+  }
+}
+```
+
+2. **Wire it into the serve target** in `angular.json` (`projects.<app>.architect.serve.options`):
+
+```json
+"serve": {
+  "builder": "@angular/build:dev-server",
+  "options": {
+    "proxyConfig": "proxy.conf.json"
+  },
+  "configurations": { }
+}
+```
+
+3. **Run both together** with `concurrently`:
 
 ```json
 {
@@ -167,6 +204,8 @@ Use `concurrently` to run the frontend dev server and BFF together:
   "start:bff": "cd bff && npm start"
 }
 ```
+
+Set `ALLOWED_ORIGIN` to `http://localhost:4200` in `bff/local.settings.json` — it drives both the CORS headers and the non-secure cookie fallback.
 
 ### Step 7: Deploy to Azure Static Web Apps
 
@@ -193,6 +232,13 @@ Azure SWA silently drops `Set-Cookie` headers from managed function responses. U
 ### Azure SWA URL-encodes cookie values
 
 `@hapi/iron` sealed tokens contain `*` characters (e.g., `Fe26.2**...`). Azure SWA encodes these to `%2A`. When the browser sends the cookie back, `unseal()` fails on the encoded string. Always `decodeURIComponent()` the cookie value before unsealing, with a try/catch fallback for already-decoded values.
+
+### Local login "succeeds" but the user stays logged out
+
+Two independent causes, both silent:
+
+1. The frontend calls `http://localhost:7071` directly while served from `http://localhost:4200` — cross-site request, browser discards the `SameSite=Lax` session cookie. Proxy `/api` through the dev server instead (Step 6).
+2. The cookie carries `Secure` over plain http — browser discards it. Derive `secure` from `ALLOWED_ORIGIN` instead of hardcoding `true`.
 
 ### CORS headers on error responses
 
@@ -233,13 +279,13 @@ When adding a new proxied resource, follow this checklist:
 
 ## Environment variables
 
-| Variable                 | Description                    | Example                                     |
-| ------------------------ | ------------------------------ | ------------------------------------------- |
-| `SESSION_SECRET`         | 32+ char secret for @hapi/iron | `openssl rand -base64 32`                   |
-| `KEYCLOAK_URL`           | Keycloak realm URL             | `https://keycloak.example.com/realms/myapp` |
-| `KEYCLOAK_CLIENT_ID`     | Confidential client ID         | `bff-myapp`                                 |
-| `KEYCLOAK_CLIENT_SECRET` | Client secret from Keycloak    | `R8jk2D8...`                                |
-| `BACKEND_API_URL`        | Backend API base URL           | `https://api.example.com`                   |
-| `ALLOWED_ORIGIN`         | Frontend origin for CORS       | `https://myapp.azurestaticapps.net`         |
+| Variable                 | Description                                                                                       | Example                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `SESSION_SECRET`         | 32+ char secret for @hapi/iron                                                                    | `openssl rand -base64 32`                                     |
+| `KEYCLOAK_URL`           | Keycloak realm URL                                                                                | `https://keycloak.example.com/realms/myapp`                   |
+| `KEYCLOAK_CLIENT_ID`     | Confidential client ID                                                                            | `bff-myapp`                                                   |
+| `KEYCLOAK_CLIENT_SECRET` | Client secret from Keycloak                                                                       | `R8jk2D8...`                                                  |
+| `BACKEND_API_URL`        | Backend API base URL                                                                              | `https://api.example.com`                                     |
+| `ALLOWED_ORIGIN`         | Frontend origin for CORS; an `http://` value also disables the `Secure` cookie flag for local dev | `https://myapp.azurestaticapps.net` / `http://localhost:4200` |
 
 For local development, set these in `bff/local.settings.json` (gitignored). For production, set them as Azure SWA Application Settings via `az staticwebapp appsettings set`.
