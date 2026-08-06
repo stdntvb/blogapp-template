@@ -1,9 +1,19 @@
+@if (loading()) {
+  <p>Laden...</p>
+}
+
+@if (errorMessage()) {
+  <p>{{ errorMessage() }}</p>
+}
+
 <div class="blog-grid">
-  @for (blog of blogs; track blog.id) {
+  @for (blog of blogs(); track blog.id) {
     <div class="blog-item">
       <app-blog-card [blog]="blog" (liked)="toggleLike($event)" />
     </div>
   } @empty {
-    <p class="empty-state">Keine Blog-Posts vorhanden.</p>
+    @if (!loading()) {
+      <p>Keine Blog-Posts vorhanden.</p>
+    }
   }
 </div>

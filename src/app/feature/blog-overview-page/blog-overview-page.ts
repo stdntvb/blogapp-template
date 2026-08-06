@@ -1,5 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+
 import { BlogCard } from '../../blog-card/blog-card';
+import { Blog } from '../../models/blog.model';
 import { BlogService } from '../blog/blog';
 
 @Component({
@@ -9,23 +11,44 @@ import { BlogService } from '../blog/blog';
   styleUrl: './blog-overview-page.scss',
 })
 export class BlogOverviewPage {
-  private blogService = inject(BlogService);
+  private readonly blogService = inject(BlogService);
 
-  blogs = this.blogService.getAll();
+  readonly blogs = signal<Blog[]>([]);
+  readonly loading = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+
+  constructor() {
+    void this.loadBlogs();
+  }
+
+  async loadBlogs() {
+    this.loading.set(true);
+    this.errorMessage.set(null);
+
+    try {
+      const blogs = await this.blogService.getBlogs();
+
+      this.blogs.set(blogs);
+    } catch (error) {
+      console.error('Fehler beim Laden der Blogs:', error);
+      this.errorMessage.set('Die Blogs konnten nicht geladen werden.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
 
   toggleLike(id: number) {
-    const blog = this.blogs.find((blog) => blog.id === id);
+    this.blogs.update((blogs) =>
+      blogs.map((blog) => {
+        if (blog.id !== id) {
+          return blog;
+        }
 
-    if (!blog) {
-      return;
-    }
+        blog.likedByMe = !blog.likedByMe;
+        blog.likes = blog.likedByMe ? blog.likes + 1 : blog.likes - 1;
 
-    blog.likedByMe = !blog.likedByMe;
-
-    if (blog.likedByMe) {
-      blog.likes++;
-    } else {
-      blog.likes--;
-    }
+        return blog;
+      }),
+    );
   }
 }

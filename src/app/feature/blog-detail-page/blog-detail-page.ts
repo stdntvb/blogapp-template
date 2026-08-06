@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 
-import { Blog } from '../../models/blog.model';
+import { BlogDetail } from '../../models/blog.model';
 
 @Component({
   selector: 'app-blog-detail-page',
@@ -13,5 +13,5 @@ import { Blog } from '../../models/blog.model';
 export class BlogDetailPage {
   private route = inject(ActivatedRoute);
 
-  blog = computed(() => this.route.snapshot.data['blog'] as Blog | undefined);
+  blog = computed(() => this.route.snapshot.data['blog'] as BlogDetail | undefined);
 }

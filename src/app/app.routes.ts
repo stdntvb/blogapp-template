@@ -4,10 +4,7 @@ import { BlogOverviewPage } from './feature/blog-overview-page/blog-overview-pag
 import { blogResolver } from './feature/blog/blog-resolver';
 
 export const routes: Routes = [
-  {
-    path: '',
-    component: BlogOverviewPage,
-  },
+  { path: '', component: BlogOverviewPage },
   {
     path: 'blog/:id',
     loadComponent: () =>
