@@ -1,6 +1,13 @@
 <mat-card class="blog-card" appearance="outlined" (click)="openBlog()">
   @if (blog().headerImageUrl) {
     <img class="blog-card__image" matCardImage [src]="blog().headerImageUrl" [alt]="blog().title" />
+  } @else {
+    <img
+      class="blog-card__image"
+      matCardImage
+      src="/images/blog-placeholder-image.jpg"
+      alt="Platzhalterbild"
+    />
   }
 
   <mat-card-header class="blog-card__header">

@@ -7,7 +7,11 @@
 }
 
 .blog-card {
+  width: 100%;
+  min-height: 22rem;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   cursor: pointer;
   @include mixins.card-surface;
@@ -31,6 +35,7 @@
 }
 
 .blog-card__header {
+  min-height: 4.5rem;
   padding-top: vars.$spacing-lg;
   padding-bottom: vars.$spacing-md;
 }
@@ -43,6 +48,7 @@
 }
 
 .blog-card__content {
+  flex: 1;
   padding-bottom: vars.$spacing-md;
 }
 
@@ -50,5 +56,21 @@
   display: flex;
   align-items: center;
   gap: vars.$spacing-sm;
+  margin-top: auto;
   padding-bottom: vars.$spacing-lg;
 }
+
+.blog-card__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+.blog-card__image-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--mat-sys-primary-container);
+}
+
+// ... existing code ...
