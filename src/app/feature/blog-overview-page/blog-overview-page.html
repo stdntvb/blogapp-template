@@ -1,18 +1,40 @@
-@if (loading()) {
+@if (state.loading()) {
   <p>Laden...</p>
 }
 
-@if (errorMessage()) {
-  <p>{{ errorMessage() }}</p>
+@if (state.error()) {
+  <p>{{ state.error() }}</p>
 }
 
+<div class="overview-toolbar">
+  <div class="filter">
+    <label for="author-filter">Autor</label>
+
+    <select
+      id="author-filter"
+      [value]="state.selectedAuthor()"
+      (change)="state.setAuthor($any($event.target).value)"
+    >
+      <option value="all">Alle Autoren</option>
+
+      @for (author of state.authors(); track author) {
+        <option [value]="author">
+          {{ author }}
+        </option>
+      }
+    </select>
+  </div>
+
+  <span class="blog-count"> {{ state.blogCount() }} Blogs </span>
+</div>
+
 <div class="blog-grid">
-  @for (blog of blogs(); track blog.id) {
+  @for (blog of state.filteredBlogs(); track blog.id) {
     <div class="blog-item">
-      <app-blog-card [blog]="blog" (liked)="toggleLike($event)" />
+      <app-blog-card [blog]="blog" (liked)="state.toggleLike($event)" />
     </div>
   } @empty {
-    @if (!loading()) {
+    @if (!state.loading()) {
       <p>Keine Blog-Posts vorhanden.</p>
     }
   }
