@@ -1,0 +1,23 @@
+{
+  "name": "bff-blogapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "func start",
+    "prestart": "npm run build",
+    "test": "npm run build && node --test dist/lib/*.spec.js"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.11.2",
+    "@hapi/iron": "^7.0.1",
+    "jose": "^6.2.2"
+  },
+  "devDependencies": {
+    "@types/hapi__iron": "^6.0.1",
+    "@types/node": "^22.9.0",
+    "typescript": "~5.9.3"
+  }
+}

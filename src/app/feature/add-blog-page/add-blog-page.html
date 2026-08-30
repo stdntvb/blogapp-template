@@ -1,0 +1,60 @@
+<section class="add-blog">
+  <h1>Neuen Beitrag erstellen</h1>
+
+  @if (user(); as u) {
+    <p class="who" data-testid="add-blog-user">
+      Angemeldet als <strong>{{ u.preferred_username }}</strong>
+    </p>
+  }
+
+  <form (submit)="$event.preventDefault(); submit()">
+    <label>
+      <span>Titel</span>
+      <input
+        type="text"
+        name="title"
+        required
+        [value]="title()"
+        (input)="update('title', $event)"
+        data-testid="add-blog-title"
+      />
+    </label>
+
+    <label>
+      <span>Inhalt</span>
+      <textarea
+        name="content"
+        rows="10"
+        required
+        [value]="content()"
+        (input)="update('content', $event)"
+        data-testid="add-blog-content"
+      ></textarea>
+    </label>
+
+    <label>
+      <span>Header-Bild-URL (optional)</span>
+      <input
+        type="url"
+        name="headerImageUrl"
+        [value]="headerImageUrl()"
+        (input)="update('headerImageUrl', $event)"
+        data-testid="add-blog-image"
+      />
+    </label>
+
+    @if (error(); as message) {
+      <div class="error-message" role="alert" data-testid="add-blog-error">{{ message }}</div>
+    }
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="!canSubmit()"
+      data-testid="add-blog-submit"
+    >
+      {{ submitting() ? 'Wird gespeichert …' : 'Beitrag veröffentlichen' }}
+    </button>
+  </form>
+</section>
