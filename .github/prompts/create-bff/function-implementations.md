@@ -1,159 +1,172 @@
 # BFF Function Implementations
 
-Complete source code for all Azure Function endpoints. Each function follows the same pattern: handle preflight, check CSRF (state-changing only), do the work, return response with CORS headers and cookies.
+Complete source code for all Azure Function endpoints.
 
-## auth-login.ts — POST /api/auth/login
+Two shapes exist, and confusing them is the most common mistake:
 
-Accepts `{ username, password }`, authenticates via Keycloak ROPC, seals the session into a cookie, and returns user claims extracted from the JWT access token. Uses `jose.decodeJwt()` (no signature verification needed because the token comes directly from Keycloak over HTTPS).
+- **Navigation endpoints** (`auth/login`, `auth/callback`) — the browser goes there directly. `methods: ["GET"]` only, no CORS, no CSRF, and every outcome is a redirect. Returning JSON from these means the user stares at raw JSON in the address bar.
+- **Fetch endpoints** (`auth/me`, `auth/logout`, all proxies) — preflight, CSRF on state-changing methods, CORS headers on every response including errors, cookies via the `cookies` array.
+
+## auth-login.ts — GET /api/auth/login
+
+Starts the flow. Generates the PKCE pair and `state`, validates `returnUrl`, stores all three in the short-lived sealed `__pkce` cookie, and redirects to Keycloak.
+
+Azure Functions are stateless and there is no session store, so the `__pkce` cookie _is_ the state between the two requests. `SameSite=Lax` sends it back on the callback because that is a top-level GET navigation.
 
 ```typescript
 import { app, HttpRequest, HttpResponseInit } from '@azure/functions';
-import { authenticateUser } from '../lib/keycloak.js';
-import { sealSession, sessionCookie } from '../lib/session.js';
-import { checkCsrf } from '../lib/csrf.js';
-import { corsHeaders, handlePreflight } from '../lib/cors.js';
-import { decodeJwt } from 'jose';
+import { buildAuthorizeUrl, createPkcePair, randomState, safeReturnUrl } from '../lib/keycloak.js';
+import { sealPkce, pkceCookie } from '../lib/session.js';
 
+/**
+ * Starts the Authorization Code flow. This is a top-level browser navigation,
+ * not a fetch — no CSRF header is possible or needed, nothing is mutated.
+ */
 async function authLogin(request: HttpRequest): Promise<HttpResponseInit> {
-  const preflight = handlePreflight(request);
-  if (preflight) return preflight;
+  const { verifier, challenge } = createPkcePair();
+  const state = randomState();
+  const returnUrl = safeReturnUrl(request.query.get('returnUrl'));
 
-  const csrfError = checkCsrf(request);
-  if (csrfError) return { ...csrfError, headers: corsHeaders };
+  const sealed = await sealPkce({ verifier, state, returnUrl });
 
-  try {
-    const body = (await request.json()) as {
-      username?: string;
-      password?: string;
-    };
-    const { username, password } = body;
-
-    if (!username || !password) {
-      return {
-        status: 400,
-        jsonBody: { error: 'Username and password are required' },
-        headers: corsHeaders,
-      };
-    }
-
-    const tokens = await authenticateUser(username, password);
-    const sealed = await sealSession({
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: Date.now() + tokens.expires_in * 1000,
-    });
-
-    const claims = decodeJwt(tokens.access_token);
-
-    return {
-      status: 200,
-      jsonBody: {
-        isAuthenticated: true,
-        user: {
-          preferred_username: claims.preferred_username,
-          email: claims.email,
-          name: claims.name,
-          roles: (claims as Record<string, unknown>).realm_access
-            ? (
-                (claims as Record<string, unknown>).realm_access as {
-                  roles: string[];
-                }
-              ).roles
-            : [],
-        },
-      },
-      headers: corsHeaders,
-      cookies: [sessionCookie(sealed)],
-    };
-  } catch (error) {
-    return {
-      status: 401,
-      jsonBody: {
-        error: error instanceof Error ? error.message : 'Authentication failed',
-      },
-      headers: corsHeaders,
-    };
-  }
+  return {
+    status: 302,
+    headers: { Location: buildAuthorizeUrl(state, challenge) },
+    cookies: [pkceCookie(sealed)],
+  };
 }
 
 app.http('auth-login', {
-  methods: ['POST', 'OPTIONS'],
+  methods: ['GET'],
   authLevel: 'anonymous',
   route: 'auth/login',
   handler: authLogin,
 });
 ```
 
-## auth-logout.ts — POST /api/auth/logout
+## auth-callback.ts — GET /api/auth/callback
 
-Revokes the refresh token at Keycloak (best-effort — errors are swallowed so logout always succeeds), then clears the session cookie.
+Completes the flow. Compares `state` against the sealed cookie, exchanges the code for tokens, and swaps the flow cookie for the session cookies.
+
+The `state` comparison is what protects this endpoint — it is exactly why `state` exists, and it substitutes for the CSRF header a navigation cannot carry.
+
+Every failure redirects to `/login?error=…` with one of three user-facing codes. Details go to the log, not the URL: the browser only needs to know whether to apologise, ask again, or offer a retry.
 
 ```typescript
-import { app, HttpRequest, HttpResponseInit } from '@azure/functions';
-import { parseCookie, unsealSession, clearSessionCookieObj } from '../lib/session.js';
-import { revokeToken } from '../lib/keycloak.js';
-import { checkCsrf } from '../lib/csrf.js';
-import { corsHeaders, handlePreflight } from '../lib/cors.js';
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { exchangeCode } from '../lib/keycloak.js';
+import {
+  PKCE_COOKIE,
+  clearPkceCookie,
+  parseCookie,
+  sealSession,
+  sessionCookies,
+  sessionFromTokens,
+  unsealPkce,
+} from '../lib/session.js';
 
-async function authLogout(request: HttpRequest): Promise<HttpResponseInit> {
-  const preflight = handlePreflight(request);
-  if (preflight) return preflight;
+type LoginError = 'access_denied' | 'expired' | 'failed';
 
-  const csrfError = checkCsrf(request);
-  if (csrfError) return { ...csrfError, headers: corsHeaders };
-
-  const cookieHeader = request.headers.get('cookie');
-  const sealed = parseCookie(cookieHeader);
-
-  if (sealed) {
-    const session = await unsealSession(sealed);
-    if (session) {
-      await revokeToken(session.refreshToken).catch(() => {
-        /* ignore */
-      });
-    }
-  }
-
+function backToLogin(reason: LoginError): HttpResponseInit {
   return {
-    status: 200,
-    jsonBody: { isAuthenticated: false },
-    headers: corsHeaders,
-    cookies: [clearSessionCookieObj()],
+    status: 302,
+    headers: { Location: `/login?error=${reason}` },
+    cookies: [clearPkceCookie()],
   };
 }
 
-app.http('auth-logout', {
-  methods: ['POST', 'OPTIONS'],
+async function authCallback(
+  request: HttpRequest,
+  context: InvocationContext,
+): Promise<HttpResponseInit> {
+  const error = request.query.get('error');
+  if (error) {
+    context.log(`Keycloak rejected the login: ${error}`);
+    return backToLogin(error === 'access_denied' ? 'access_denied' : 'failed');
+  }
+
+  const sealed = parseCookie(request.headers.get('cookie'), PKCE_COOKIE);
+  const pkce = sealed ? await unsealPkce(sealed) : null;
+  if (!pkce) {
+    return backToLogin('expired');
+  }
+
+  if (request.query.get('state') !== pkce.state) {
+    context.error('Callback state does not match the one issued at login');
+    return backToLogin('failed');
+  }
+
+  const code = request.query.get('code');
+  if (!code) {
+    return backToLogin('failed');
+  }
+
+  try {
+    const tokens = await exchangeCode(code, pkce.verifier);
+    const session = await sealSession(sessionFromTokens(tokens));
+
+    return {
+      status: 302,
+      headers: { Location: pkce.returnUrl },
+      cookies: [...sessionCookies(session, request.headers.get('cookie')), clearPkceCookie()],
+    };
+  } catch (err) {
+    context.error('Token exchange failed', err);
+    return backToLogin('failed');
+  }
+}
+
+app.http('auth-callback', {
+  methods: ['GET'],
   authLevel: 'anonymous',
-  route: 'auth/logout',
-  handler: authLogout,
+  route: 'auth/callback',
+  handler: authCallback,
 });
 ```
 
+`pkce.returnUrl` is safe to redirect to without re-checking: it was validated by `safeReturnUrl()` before being sealed, and the seal is authenticated.
+
 ## auth-me.ts — GET /api/auth/me
 
-Returns the current authentication status and user claims. If the session is expired, attempts a transparent token refresh. No CSRF check (GET request).
+The only way the SPA learns who is logged in. Called on every app start, and therefore after every login, since the callback ends in a full page load.
+
+Refreshes transparently when the token has expired. Never returns 401 for "not logged in" — an anonymous visitor is a normal state, not an error.
+
+`decodeJwt()` does not verify the signature, which is fine: the token came straight from Keycloak over HTTPS into a sealed cookie, and the backend verifies it for real.
 
 ```typescript
 import { app, Cookie, HttpRequest, HttpResponseInit } from '@azure/functions';
 import {
-  parseCookie,
+  parseSessionCookie,
   unsealSession,
   isSessionExpired,
   sealSession,
-  sessionCookie,
-  clearSessionCookieObj,
+  sessionCookies,
+  sessionFromTokens,
+  clearSessionCookies,
 } from '../lib/session.js';
 import { refreshTokens } from '../lib/keycloak.js';
 import { corsHeaders, handlePreflight } from '../lib/cors.js';
 import { decodeJwt } from 'jose';
+
+function userFromToken(accessToken: string) {
+  const claims = decodeJwt(accessToken) as Record<string, unknown>;
+  const realmAccess = claims.realm_access as { roles: string[] } | undefined;
+
+  return {
+    preferred_username: claims.preferred_username,
+    email: claims.email,
+    name: claims.name,
+    roles: realmAccess?.roles ?? [],
+  };
+}
 
 async function authMe(request: HttpRequest): Promise<HttpResponseInit> {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
   const cookieHeader = request.headers.get('cookie');
-  const sealed = parseCookie(cookieHeader);
+  const sealed = parseSessionCookie(cookieHeader);
 
   if (!sealed) {
     return {
@@ -169,7 +182,7 @@ async function authMe(request: HttpRequest): Promise<HttpResponseInit> {
       status: 200,
       jsonBody: { isAuthenticated: false, user: null },
       headers: corsHeaders,
-      cookies: [clearSessionCookieObj()],
+      cookies: clearSessionCookies(cookieHeader),
     };
   }
 
@@ -178,42 +191,22 @@ async function authMe(request: HttpRequest): Promise<HttpResponseInit> {
   if (isSessionExpired(session)) {
     try {
       const tokens = await refreshTokens(session.refreshToken);
-      session = {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiresAt: Date.now() + tokens.expires_in * 1000,
-      };
-      const newSealed = await sealSession(session);
-      extraCookies.push(sessionCookie(newSealed));
+      session = sessionFromTokens(tokens);
+      extraCookies.push(...sessionCookies(await sealSession(session), cookieHeader));
     } catch {
+      // Keycloak's SSO Session Idle/Max has run out — the session is genuinely over.
       return {
         status: 200,
         jsonBody: { isAuthenticated: false, user: null },
         headers: corsHeaders,
-        cookies: [clearSessionCookieObj()],
+        cookies: clearSessionCookies(cookieHeader),
       };
     }
   }
 
-  const claims = decodeJwt(session.accessToken);
-
   return {
     status: 200,
-    jsonBody: {
-      isAuthenticated: true,
-      user: {
-        preferred_username: claims.preferred_username,
-        email: claims.email,
-        name: claims.name,
-        roles: (claims as Record<string, unknown>).realm_access
-          ? (
-              (claims as Record<string, unknown>).realm_access as {
-                roles: string[];
-              }
-            ).roles
-          : [],
-      },
-    },
+    jsonBody: { isAuthenticated: true, user: userFromToken(session.accessToken) },
     headers: corsHeaders,
     cookies: extraCookies.length > 0 ? extraCookies : undefined,
   };
@@ -227,24 +220,22 @@ app.http('auth-me', {
 });
 ```
 
-## auth-refresh.ts — POST /api/auth/refresh
+## auth-logout.ts — POST /api/auth/logout
 
-Explicit token refresh endpoint. The frontend can call this proactively to renew the session before it expires.
+Revokes the refresh token, clears the session chunks, and hands back the Keycloak end-session URL for the client to navigate to.
+
+**Why it stays a POST.** Making logout a redirect endpoint would strip its CSRF protection — a navigation cannot carry `X-Requested-With`, so any page could log your users out with an `<img src>`. Returning the URL as JSON keeps the check and still ends the SSO session.
+
+**Why `id_token_hint` matters.** Without the end-session call, Keycloak's SSO session survives. The user logs out, clicks login, and is back in without a password — indistinguishable from a bug. This is the reason the ID token is stored in the session at all.
 
 ```typescript
 import { app, HttpRequest, HttpResponseInit } from '@azure/functions';
-import {
-  parseCookie,
-  unsealSession,
-  sealSession,
-  sessionCookie,
-  clearSessionCookieObj,
-} from '../lib/session.js';
-import { refreshTokens } from '../lib/keycloak.js';
+import { parseSessionCookie, unsealSession, clearSessionCookies } from '../lib/session.js';
+import { buildLogoutUrl, revokeToken, POST_LOGOUT_REDIRECT_URI } from '../lib/keycloak.js';
 import { checkCsrf } from '../lib/csrf.js';
 import { corsHeaders, handlePreflight } from '../lib/cors.js';
 
-async function authRefresh(request: HttpRequest): Promise<HttpResponseInit> {
+async function authLogout(request: HttpRequest): Promise<HttpResponseInit> {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
@@ -252,64 +243,43 @@ async function authRefresh(request: HttpRequest): Promise<HttpResponseInit> {
   if (csrfError) return { ...csrfError, headers: corsHeaders };
 
   const cookieHeader = request.headers.get('cookie');
-  const sealed = parseCookie(cookieHeader);
+  const sealed = parseSessionCookie(cookieHeader);
+  const session = sealed ? await unsealSession(sealed) : null;
 
-  if (!sealed) {
-    return {
-      status: 401,
-      jsonBody: { error: 'No session' },
-      headers: corsHeaders,
-    };
-  }
+  let logoutUrl = POST_LOGOUT_REDIRECT_URI;
 
-  const session = await unsealSession(sealed);
-  if (!session) {
-    return {
-      status: 401,
-      jsonBody: { error: 'Invalid session' },
-      headers: corsHeaders,
-    };
-  }
-
-  try {
-    const tokens = await refreshTokens(session.refreshToken);
-    const newSealed = await sealSession({
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: Date.now() + tokens.expires_in * 1000,
+  if (session) {
+    await revokeToken(session.refreshToken).catch(() => {
+      /* ignore */
     });
-
-    return {
-      status: 200,
-      jsonBody: { refreshed: true },
-      headers: corsHeaders,
-      cookies: [sessionCookie(newSealed)],
-    };
-  } catch {
-    return {
-      status: 401,
-      jsonBody: { error: 'Refresh failed' },
-      headers: corsHeaders,
-      cookies: [clearSessionCookieObj()],
-    };
+    logoutUrl = buildLogoutUrl(session.idToken);
   }
+
+  return {
+    status: 200,
+    jsonBody: { logoutUrl },
+    headers: corsHeaders,
+    cookies: clearSessionCookies(cookieHeader),
+  };
 }
 
-app.http('auth-refresh', {
+app.http('auth-logout', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',
-  route: 'auth/refresh',
-  handler: authRefresh,
+  route: 'auth/logout',
+  handler: authLogout,
 });
 ```
 
+> There is no `auth-refresh.ts`. Refresh already happens inside `auth-me` and the proxy before the real work, so an explicit endpoint is code the frontend never calls — and one more place to keep in sync.
+
 ## Proxy endpoints
 
-All proxy endpoints follow the same pattern. Here are examples for common resource types.
+All proxy endpoints follow the same pattern. Authorisation lives in `proxyToBackend()`: it returns 401 for state-changing requests without a session, so these files only handle routing and CSRF.
 
 ### proxy-entries.ts — GET/POST /api/entries
 
-Handles both read (GET, public) and create (POST, auth + CSRF required) on the same route. Two functions cannot share the same route in Azure Functions, so both methods are in one file.
+Handles both read (GET, public) and create (POST, auth + CSRF required) on the same route. Two functions cannot share a route in Azure Functions, so both methods live in one file.
 
 ```typescript
 import { app, HttpRequest, HttpResponseInit } from '@azure/functions';

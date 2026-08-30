@@ -14,7 +14,8 @@ The `"type": "module"` field is required because `jose` (JWT decoding) is ESM-on
   "scripts": {
     "build": "tsc",
     "start": "func start",
-    "prestart": "npm run build"
+    "prestart": "npm run build",
+    "test": "npm run build && node --test dist/lib/*.spec.js"
   },
   "dependencies": {
     "@azure/functions": "^4.11.2",
@@ -30,6 +31,8 @@ The `"type": "module"` field is required because `jose` (JWT decoding) is ESM-on
 ```
 
 **Watch out:** `@types/hapi__iron@^6.0.6` does not exist on npm. Use `^6.0.1`.
+
+The `test` script needs no dependency: `node:test` and `node:assert` ship with Node. The glob picks up `src/lib/*.spec.ts` once compiled — see the test section in `lib-implementations.md`.
 
 ## tsconfig.json
 
@@ -83,7 +86,7 @@ Standard Azure Functions v4 host configuration with extension bundle.
 
 Add `bff/local.settings.json` to `.gitignore`. This file holds secrets for local development.
 
-`ALLOWED_ORIGIN` must be the dev server origin (`http://localhost:4200`). Its `http://` scheme is also what makes `session.ts` drop the `Secure` cookie flag, without which local login never persists.
+`ALLOWED_ORIGIN` must be the dev server origin (`http://localhost:4200`), with no trailing slash. It does three jobs: the CORS origin, the `http://` scheme that makes `session.ts` drop the `Secure` cookie flag (without which local login never persists), and the base for the OAuth redirect URIs. `keycloak.ts` refuses to start without it.
 
 ```json
 {
@@ -110,9 +113,9 @@ Every function file must be imported here. Azure Functions v4 uses the programmi
 
 ```typescript
 import './functions/auth-login.js';
+import './functions/auth-callback.js';
 import './functions/auth-logout.js';
 import './functions/auth-me.js';
-import './functions/auth-refresh.js';
 import './functions/proxy-entries.js';
 import './functions/proxy-entry-by-id.js';
 // Add more proxy imports as needed
