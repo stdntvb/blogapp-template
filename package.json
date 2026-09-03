@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "concurrently -n web,bff -c blue,green \"npm:start:web\" \"npm:start:bff\"",
+    "start:web": "ng serve",
+    "start:bff": "cd bff && npm start",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch",
@@ -61,6 +63,7 @@
     "@angular/compiler-cli": "^22.0.8",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^20.4.3",
+    "concurrently": "^9.1.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.1.8",

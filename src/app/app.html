@@ -19,6 +19,18 @@
 
   <a mat-button routerLink="/about" routerLinkActive="active-link"> About </a>
 
+  @if (authEnabled) {
+    @if (isAuthenticated()) {
+      <a mat-button routerLink="/add-blog" routerLinkActive="active-link"> Neuer Beitrag </a>
+      <span class="username" data-testid="username">{{ user()?.preferred_username }}</span>
+      <button mat-button type="button" data-testid="logout" (click)="signOut()">Logout</button>
+    } @else {
+      <a mat-button routerLink="/login" routerLinkActive="active-link" data-testid="login-link">
+        Login
+      </a>
+    }
+  }
+
   <button
     mat-icon-button
     type="button"

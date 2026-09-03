@@ -5,6 +5,11 @@ const angular = require('angular-eslint');
 
 module.exports = tseslint.config(
   {
+    // The BFF is a standalone Node project with its own tsconfig and toolchain;
+    // it is not part of the Angular app and must not be linted with this config.
+    ignores: ['bff/**', 'dist/**', 'coverage/**', '.angular/**', 'playwright-report/**'],
+  },
+  {
     files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,

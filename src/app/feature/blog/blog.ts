@@ -3,7 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { Blog, BlogDetail, BlogDetailSchema, BlogResponseSchema } from '../../models/blog.model';
+import {
+  Blog,
+  BlogDetail,
+  BlogDetailSchema,
+  BlogResponseSchema,
+  CreateBlog,
+  CreateBlogSchema,
+} from '../../models/blog.model';
 
 @Injectable({
   providedIn: 'root',
@@ -26,6 +33,25 @@ export class BlogService {
       return result.data.data;
     } catch (error) {
       console.error('Blogs konnten nicht geladen werden:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a blog entry. The request goes through the BFF proxy (`POST /api/entries`),
+   * which attaches the bearer token server-side — the cookie interceptor only adds
+   * `withCredentials` and the CSRF header. Returns the new entry's id when the
+   * backend echoes it, otherwise null (caller falls back to the overview).
+   */
+  async createBlog(input: CreateBlog): Promise<number | null> {
+    const payload = CreateBlogSchema.parse(input);
+
+    try {
+      const response = await firstValueFrom(this.http.post<unknown>(this.apiUrl, payload));
+      const result = BlogDetailSchema.safeParse(response);
+      return result.success ? result.data.id : null;
+    } catch (error) {
+      console.error('Blog konnte nicht erstellt werden:', error);
       throw error;
     }
   }
