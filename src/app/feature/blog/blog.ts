@@ -9,6 +9,7 @@ import {
   BlogDetailSchema,
   BlogResponseSchema,
   CreateBlog,
+  CreateBlogSchema,
 } from '../../models/blog.model';
 
 @Injectable({
@@ -43,8 +44,10 @@ export class BlogService {
    * backend echoes it, otherwise null (caller falls back to the overview).
    */
   async createBlog(input: CreateBlog): Promise<number | null> {
+    const payload = CreateBlogSchema.parse(input);
+
     try {
-      const response = await firstValueFrom(this.http.post<unknown>(this.apiUrl, input));
+      const response = await firstValueFrom(this.http.post<unknown>(this.apiUrl, payload));
       const result = BlogDetailSchema.safeParse(response);
       return result.success ? result.data.id : null;
     } catch (error) {

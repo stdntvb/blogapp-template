@@ -18,6 +18,7 @@ export class AddBlogPage {
   private readonly router = inject(Router);
 
   protected readonly user = this.authStore.user;
+  protected readonly roles = this.authStore.roles;
 
   protected readonly title = signal('');
   protected readonly content = signal('');
@@ -57,5 +58,3 @@ export class AddBlogPage {
     }
   }
 }
-
-export default AddBlogPage;

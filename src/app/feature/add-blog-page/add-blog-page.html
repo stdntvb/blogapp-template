@@ -3,7 +3,7 @@
 
   @if (user(); as u) {
     <p class="who" data-testid="add-blog-user">
-      Angemeldet als <strong>{{ u.preferred_username }}</strong>
+      Angemeldet als <strong>{{ u.preferred_username }}</strong> — Rollen: {{ roles().join(', ') }}
     </p>
   }
 

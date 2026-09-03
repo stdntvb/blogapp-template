@@ -41,5 +41,3 @@ export class LoginPage {
     window.location.href = `${environment.bffUrl}/auth/login?returnUrl=${returnUrl}`;
   }
 }
-
-export default LoginPage;
