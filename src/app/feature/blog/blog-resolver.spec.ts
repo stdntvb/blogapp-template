@@ -3,30 +3,38 @@ import { ActivatedRouteSnapshot, ResolveFn, RouterStateSnapshot } from '@angular
 
 import { BlogDetail } from '../../models/blog.model';
 import { blogResolver } from './blog-resolver';
+import { BlogService } from './blog';
 
 describe('blogResolver', () => {
   const executeResolver: ResolveFn<BlogDetail | undefined> = (...resolverParameters) =>
     TestBed.runInInjectionContext(() => blogResolver(...resolverParameters));
 
+  const blogServiceMock = {
+    getById: vi.fn(),
+  };
+
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    vi.clearAllMocks();
+    TestBed.configureTestingModule({
+      providers: [{ provide: BlogService, useValue: blogServiceMock }],
+    });
   });
 
   it('should be created', () => {
     expect(executeResolver).toBeTruthy();
   });
 
-  it('should resolve a blog by id', () => {
+  it('should resolve a blog by id', async () => {
+    const blog = { id: 1, title: 'Test' } as BlogDetail;
+    blogServiceMock.getById.mockResolvedValue(blog);
+
     const route = {
-      paramMap: {
-        get: () => '1',
-      },
+      paramMap: { get: () => '1' },
     } as unknown as ActivatedRouteSnapshot;
 
-    const state = {} as RouterStateSnapshot;
+    const result = await executeResolver(route, {} as RouterStateSnapshot);
 
-    const result = executeResolver(route, state);
-
-    expect(result).toBeTruthy();
+    expect(blogServiceMock.getById).toHaveBeenCalledWith(1);
+    expect(result).toEqual(blog);
   });
 });

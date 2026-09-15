@@ -1,0 +1,18 @@
+<section class="login">
+  <h1>Anmelden</h1>
+  <p>Du wirst zur Anmeldeseite von Keycloak weitergeleitet.</p>
+
+  @if (errorMessage(); as message) {
+    <div class="error-message" data-testid="login-error" role="alert">{{ message }}</div>
+  }
+
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="login-submit"
+    (click)="signIn()"
+  >
+    Mit Keycloak anmelden
+  </button>
+</section>

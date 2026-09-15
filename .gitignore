@@ -11,6 +11,12 @@
 npm-debug.log
 yarn-error.log
 
+# BFF (Azure Functions)
+/bff/node_modules
+/bff/dist
+/bff/local.settings.json
+/bff/.func
+
 # IDEs and editors
 .idea/
 .project

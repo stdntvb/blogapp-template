@@ -5,6 +5,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIcon } from '@angular/material/icon';
 
+import { AuthStore } from './core/auth/auth-store';
+
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, MatToolbarModule, MatButtonModule, MatIcon],
@@ -13,13 +15,23 @@ import { MatIcon } from '@angular/material/icon';
 })
 export class App {
   private readonly document = inject(DOCUMENT);
+  private readonly authStore = inject(AuthStore);
   private readonly storageKey = 'blogapp-theme';
   protected readonly title = "Fabio's Blog";
   protected isDarkMode = false;
 
+  protected readonly authEnabled = this.authStore.authEnabled;
+  protected readonly isAuthenticated = this.authStore.isAuthenticated;
+  protected readonly user = this.authStore.user;
+
   constructor() {
     this.isDarkMode = this.readThemePreference() === 'dark';
     this.applyTheme();
+  }
+
+  protected async signOut() {
+    // Navigates away to Keycloak's end-session endpoint, so no router call here.
+    await this.authStore.logout();
   }
 
   protected toggleDarkMode() {

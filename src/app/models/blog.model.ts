@@ -45,3 +45,11 @@ export const BlogDetailSchema = BlogSchema.omit({
 });
 
 export type BlogDetail = z.infer<typeof BlogDetailSchema>;
+
+export const CreateBlogSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(1),
+  headerImageUrl: z.string().url().optional(),
+});
+
+export type CreateBlog = z.infer<typeof CreateBlogSchema>;

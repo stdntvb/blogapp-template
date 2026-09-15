@@ -1,0 +1,14 @@
+.login {
+  max-width: 32rem;
+  margin: 3rem auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.error-message {
+  color: var(--mat-sys-error, #b3261e);
+  font-weight: 500;
+}

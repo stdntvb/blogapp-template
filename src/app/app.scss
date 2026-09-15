@@ -52,6 +52,12 @@
   flex: 1 1 auto;
 }
 
+.username {
+  margin: 0 vars.$spacing-sm;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .app-toolbar a {
   color: var(--mat-sys-on-surface);
   text-decoration: none;
