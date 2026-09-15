@@ -1,0 +1,57 @@
+<section class="blog-create">
+  <h1>Neuen Beitrag erstellen</h1>
+
+  <form (submit)="onSubmit($event)">
+    <label>
+      <span>Titel</span>
+      <input type="text" [formField]="blogForm.title" data-testid="blog-create-title" />
+    </label>
+    @if (blogForm.title().touched() && blogForm.title().invalid()) {
+      <ul class="field-errors" data-testid="blog-create-title-errors">
+        @for (error of blogForm.title().errors(); track error.kind) {
+          <li>{{ error.message }}</li>
+        }
+      </ul>
+    }
+
+    <label>
+      <span>Inhalt</span>
+      <textarea
+        rows="10"
+        [formField]="blogForm.content"
+        data-testid="blog-create-content"
+      ></textarea>
+    </label>
+    @if (blogForm.content().touched() && blogForm.content().invalid()) {
+      <ul class="field-errors" data-testid="blog-create-content-errors">
+        @for (error of blogForm.content().errors(); track error.kind) {
+          <li>{{ error.message }}</li>
+        }
+      </ul>
+    }
+
+    <label>
+      <span>Kategorie</span>
+      <select [formField]="blogForm.category" data-testid="blog-create-category">
+        <option value="general">Allgemein</option>
+        <option value="tech">Technik</option>
+        <option value="lifestyle">Lifestyle</option>
+      </select>
+    </label>
+    @if (blogForm.category().touched() && blogForm.category().invalid()) {
+      <ul class="field-errors" data-testid="blog-create-category-errors">
+        @for (error of blogForm.category().errors(); track error.kind) {
+          <li>{{ error.message }}</li>
+        }
+      </ul>
+    }
+
+    <button
+      type="submit"
+      [disabled]="blogForm().invalid() || submitting()"
+      data-testid="blog-create-submit"
+    >
+      {{ submitting() ? 'Wird gespeichert …' : 'Beitrag veröffentlichen' }}
+    </button>
+  </form>
+</section>
