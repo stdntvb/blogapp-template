@@ -5,17 +5,31 @@
   display: block;
 }
 
+// Mobile-first flexbox grid: 1 column by default, 2 from 768px (tablet),
+// 3 from 1024px (desktop). flex-wrap lets items drop to the next row instead
+// of shrinking, and flex-basis (not width) keeps them growing/shrinking with
+// the gap already subtracted.
 .blog-grid {
   @include mixins.page-shell;
-  @include mixins.responsive-grid(18rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: vars.$spacing-lg;
   padding-top: vars.$spacing-md;
   padding-bottom: vars.$spacing-xl;
 }
 
 .blog-item {
   display: flex;
-  width: 100%;
+  flex: 1 1 100%;
   min-height: 100%;
+
+  @media (min-width: 768px) {
+    flex-basis: calc((100% - #{vars.$spacing-lg}) / 2);
+  }
+
+  @media (min-width: 1024px) {
+    flex-basis: calc((100% - #{vars.$spacing-lg} * 2) / 3);
+  }
 }
 
 .empty-state {

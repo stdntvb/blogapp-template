@@ -19,9 +19,3 @@
   border-radius: vars.$radius-lg;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
 }
-
-@mixin responsive-grid($min-column-width) {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, $min-column-width), 1fr));
-  gap: vars.$spacing-lg;
-}

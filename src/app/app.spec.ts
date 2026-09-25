@@ -29,6 +29,6 @@ describe('App', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
 
-    expect(compiled.querySelector('mat-toolbar')?.textContent).toContain("Fabio's Blog");
+    expect(compiled.querySelector('.app-toolbar')?.textContent).toContain("Fabio's Blog");
   });
 });
