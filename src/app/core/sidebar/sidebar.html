@@ -1,0 +1,130 @@
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav
+    #drawer
+    class="sidenav"
+    [mode]="isMobile() ? 'over' : 'side'"
+    [opened]="false"
+    [attr.role]="isMobile() ? 'dialog' : 'navigation'"
+  >
+    <mat-toolbar class="sidenav-header">Navigation</mat-toolbar>
+
+    <nav class="nav nav--drawer" aria-label="Hauptnavigation (mobil)">
+      <a
+        class="nav-link"
+        routerLink="/"
+        routerLinkActive="active-link"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="drawer.close()"
+      >
+        Blog
+      </a>
+
+      <a
+        class="nav-link"
+        routerLink="/about"
+        routerLinkActive="active-link"
+        (click)="drawer.close()"
+      >
+        About
+      </a>
+
+      @if (authEnabled()) {
+        @if (isAuthenticated()) {
+          <a
+            class="nav-link"
+            routerLink="/add-blog"
+            routerLinkActive="active-link"
+            (click)="drawer.close()"
+          >
+            Neuer Beitrag
+          </a>
+          <span class="username" data-testid="username">{{ user()?.preferred_username }}</span>
+          <button
+            class="nav-link"
+            type="button"
+            data-testid="logout"
+            (click)="drawer.close(); signOut.emit()"
+          >
+            Logout
+          </button>
+        } @else {
+          <a
+            class="nav-link"
+            routerLink="/login"
+            routerLinkActive="active-link"
+            data-testid="login-link"
+            (click)="drawer.close()"
+          >
+            Login
+          </a>
+        }
+      }
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="app-toolbar">
+      @if (isMobile()) {
+        <button mat-icon-button type="button" aria-label="Menü öffnen" (click)="drawer.toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
+
+      <span class="brand">
+        <mat-icon class="brand-icon" aria-hidden="true">article</mat-icon>
+        <a class="brand-link" routerLink="/" aria-label="Zur Startseite">{{ title() }}</a>
+      </span>
+
+      <span class="spacer"></span>
+
+      @if (!isMobile()) {
+        <nav class="nav nav--toolbar" aria-label="Hauptnavigation">
+          <a
+            mat-button
+            routerLink="/"
+            routerLinkActive="active-link"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Blog
+          </a>
+
+          <a mat-button routerLink="/about" routerLinkActive="active-link">About</a>
+
+          @if (authEnabled()) {
+            @if (isAuthenticated()) {
+              <a mat-button routerLink="/add-blog" routerLinkActive="active-link">Neuer Beitrag</a>
+              <span class="username" data-testid="username">{{ user()?.preferred_username }}</span>
+              <button mat-button type="button" data-testid="logout" (click)="signOut.emit()">
+                Logout
+              </button>
+            } @else {
+              <a
+                mat-button
+                routerLink="/login"
+                routerLinkActive="active-link"
+                data-testid="login-link"
+              >
+                Login
+              </a>
+            }
+          }
+        </nav>
+      }
+
+      <button
+        mat-icon-button
+        type="button"
+        class="theme-toggle"
+        (click)="toggleDarkMode.emit()"
+        [attr.aria-pressed]="isDarkMode()"
+        [attr.aria-label]="isDarkMode() ? 'Dark Mode deaktivieren' : 'Dark Mode aktivieren'"
+      >
+        <mat-icon>{{ isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
+    </mat-toolbar>
+
+    <main class="content">
+      <ng-content />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

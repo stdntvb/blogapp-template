@@ -5,6 +5,28 @@
     <title>Angular Template Blog</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      CSP as a meta tag, not an HTTP header: this app deploys to an Azure Storage
+      static website (see README), which cannot send custom response headers —
+      `staticwebapp.config.json` is only honoured by Azure Static Web Apps. If the
+      app ever moves behind Azure Static Web Apps / Front Door / a CDN, prefer
+      sending this as a real `Content-Security-Policy` header instead (also
+      unlocks `frame-ancestors` and `report-uri`, which browsers ignore in a
+      meta tag).
+
+      script-src/style-src are restricted to 'self' as required, with
+      'unsafe-inline' added to style-src because Angular Material writes
+      inline styles at runtime. The extra origins below are functional
+      necessities, not relaxations for convenience: fonts.googleapis.com /
+      fonts.gstatic.com serve the Google Fonts loaded above, img-src allows
+      https: because blog posts embed an author-supplied header image URL
+      (see docs/security-audit.md, finding 1), and connect-src whitelists the
+      production API host from environment.ts.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://d-cap-blog-backend---v2.whitepond-b96fee4b.westeurope.azurecontainerapps.io; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
