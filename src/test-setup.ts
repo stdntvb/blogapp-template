@@ -22,6 +22,43 @@ if (typeof globalThis.localStorage === 'undefined') {
   });
 }
 
+// Polyfill matchMedia for jsdom (used by LayoutService for responsive signals).
+// Query state is kept per-query string so repeated `matchMedia(query)` calls
+// (e.g. once in the service under test, once in a spec) share the same list
+// and a manually dispatched change event reaches listeners registered by both.
+if (typeof globalThis.matchMedia === 'undefined') {
+  const mediaQueryLists = new Map<string, MediaQueryList>();
+
+  globalThis.matchMedia = ((query: string) => {
+    const existing = mediaQueryLists.get(query);
+    if (existing) return existing;
+
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    const mutableList = {
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: (_type: 'change', listener: (event: MediaQueryListEvent) => void) =>
+        void listeners.add(listener),
+      removeEventListener: (_type: 'change', listener: (event: MediaQueryListEvent) => void) =>
+        void listeners.delete(listener),
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      addListener: () => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      removeListener: () => {},
+      dispatchEvent: () => false,
+      dispatchChange: (matches: boolean) => {
+        mutableList.matches = matches;
+        listeners.forEach((listener) => listener({ matches } as MediaQueryListEvent));
+      },
+    };
+    const mediaQueryList = mutableList as unknown as MediaQueryList;
+
+    mediaQueryLists.set(query, mediaQueryList);
+    return mediaQueryList;
+  }) as unknown as typeof globalThis.matchMedia;
+}
+
 // Polyfill IntersectionObserver for jsdom (used by Angular's @defer on viewport)
 if (typeof globalThis.IntersectionObserver === 'undefined') {
   globalThis.IntersectionObserver = class IntersectionObserver {

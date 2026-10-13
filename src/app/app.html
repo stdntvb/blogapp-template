@@ -1,48 +1,11 @@
-<mat-toolbar class="app-toolbar">
-  <span class="brand">
-    <mat-icon class="brand-icon" aria-hidden="true">article</mat-icon>
-    <a class="brand-link" routerLink="/" aria-label="Zur Startseite">
-      {{ title }}
-    </a>
-  </span>
-
-  <span class="spacer"></span>
-
-  <a
-    mat-button
-    routerLink="/"
-    routerLinkActive="active-link"
-    [routerLinkActiveOptions]="{ exact: true }"
-  >
-    Blog
-  </a>
-
-  <a mat-button routerLink="/about" routerLinkActive="active-link"> About </a>
-
-  @if (authEnabled) {
-    @if (isAuthenticated()) {
-      <a mat-button routerLink="/add-blog" routerLinkActive="active-link"> Neuer Beitrag </a>
-      <span class="username" data-testid="username">{{ user()?.preferred_username }}</span>
-      <button mat-button type="button" data-testid="logout" (click)="signOut()">Logout</button>
-    } @else {
-      <a mat-button routerLink="/login" routerLinkActive="active-link" data-testid="login-link">
-        Login
-      </a>
-    }
-  }
-
-  <button
-    mat-icon-button
-    type="button"
-    class="theme-toggle"
-    (click)="toggleDarkMode()"
-    [attr.aria-pressed]="isDarkMode"
-    [attr.aria-label]="isDarkMode ? 'Dark Mode deaktivieren' : 'Dark Mode aktivieren'"
-  >
-    <mat-icon>{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</mat-icon>
-  </button>
-</mat-toolbar>
-
-<main class="content">
+<app-sidebar
+  [title]="title"
+  [authEnabled]="authEnabled"
+  [isAuthenticated]="isAuthenticated()"
+  [user]="user()"
+  [isDarkMode]="isDarkMode"
+  (toggleDarkMode)="toggleDarkMode()"
+  (signOut)="signOut()"
+>
   <router-outlet />
-</main>
+</app-sidebar>
