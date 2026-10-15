@@ -1,3 +1,4 @@
+import { ɵEffectScheduler } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
@@ -90,14 +91,18 @@ describe('BlogStateService', () => {
     expect(service.loading()).toBe(false);
   });
 
-  it('should persist the selected author to localStorage via its effect', async () => {
+  it('should persist the selected author to localStorage via its effect', () => {
     const setItemSpy = vi.spyOn(localStorage, 'setItem');
 
     service.setAuthor('Fabio');
 
-    await vi.waitFor(() => {
-      expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
-    });
+    // The app runs zoneless (see app.config.ts), so this root-level effect is
+    // normally flushed via requestAnimationFrame, which jsdom does not fire
+    // reliably in CI. Flush the effect scheduler directly and synchronously
+    // instead of waiting for that scheduling to happen.
+    TestBed.inject(ɵEffectScheduler).flush();
+
+    expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
   });
 
   it('should return an empty authors list when there are no blogs', () => {
