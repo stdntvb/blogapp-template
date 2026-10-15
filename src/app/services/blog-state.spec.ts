@@ -1,3 +1,4 @@
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
@@ -90,11 +91,11 @@ describe('BlogStateService', () => {
     expect(service.loading()).toBe(false);
   });
 
-  it('should persist the selected author to localStorage via its effect', () => {
+  it('should persist the selected author to localStorage via its effect', async () => {
     const setItemSpy = vi.spyOn(localStorage, 'setItem');
 
     service.setAuthor('Fabio');
-    TestBed.flushEffects();
+    await TestBed.inject(ApplicationRef).whenStable();
 
     expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
   });
