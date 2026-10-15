@@ -37,6 +37,10 @@ describe('BlogStateService', () => {
     service = TestBed.inject(BlogStateService);
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
@@ -92,14 +96,20 @@ describe('BlogStateService', () => {
   });
 
   it('should persist the selected author to localStorage via its effect', () => {
-    const setItemSpy = vi.spyOn(localStorage, 'setItem');
+    // Depending on the Node/test environment, the global `localStorage` is
+    // either Node's own built-in implementation or jsdom's `Storage`-backed
+    // polyfill — the two have different internals, so spying on the existing
+    // object (or its prototype) is unreliable across environments. Replace
+    // the global outright with a plain, fully controllable stand-in instead.
+    const setItemSpy = vi.fn();
+    vi.stubGlobal('localStorage', { ...localStorage, setItem: setItemSpy });
 
     service.setAuthor('Fabio');
 
-    // The app runs zoneless (see app.config.ts), so this root-level effect is
-    // normally flushed via requestAnimationFrame, which jsdom does not fire
-    // reliably in CI. Flush the effect scheduler directly and synchronously
-    // instead of waiting for that scheduling to happen.
+    // The app is zoneless (see app.config.ts), so this root-level effect is
+    // normally flushed via requestAnimationFrame/microtask scheduling, which
+    // is not reliable across test environments. Flush the effect scheduler
+    // directly and synchronously instead of depending on that timing.
     TestBed.inject(ɵEffectScheduler).flush();
 
     expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
