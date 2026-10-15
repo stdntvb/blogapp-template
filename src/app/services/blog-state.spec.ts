@@ -1,4 +1,3 @@
-import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
@@ -95,9 +94,10 @@ describe('BlogStateService', () => {
     const setItemSpy = vi.spyOn(localStorage, 'setItem');
 
     service.setAuthor('Fabio');
-    await TestBed.inject(ApplicationRef).whenStable();
 
-    expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
+    await vi.waitFor(() => {
+      expect(setItemSpy).toHaveBeenCalledWith('selectedAuthor', 'Fabio');
+    });
   });
 
   it('should return an empty authors list when there are no blogs', () => {
